@@ -1,0 +1,57 @@
+# Accountaint — self-hosted NZ business accounting
+#
+# Quickstart:
+#   1. cp .env.docker.example .env  (and fill in values)
+#   2. mkdir -p data && sudo chown -R 1000:1000 data
+#   3. docker compose up -d
+#
+# Image is published to ghcr.io/techienz/accountaint
+#
+# To build locally instead of pulling the published image, replace the `image:`
+# line with `build: .` and run `docker compose up -d --build`.
+
+services:
+  accountaint:
+    image: ghcr.io/techienz/accountaint:latest
+    # build: .
+    container_name: accountaint
+    restart: unless-stopped
+    init: true                  # reaps Chromium zombie processes
+    shm_size: "1gb"             # Chromium needs more than the default 64MB
+
+    ports:
+      - "${PORT:-3000}:3000"
+
+    env_file:
+      - .env
+
+    environment:
+      NODE_ENV: production
+      DATABASE_PATH: /data/accountaint.db
+      # Uncomment to override the DB-stored Local LLM setting via env:
+      # LMSTUDIO_URL: http://host.docker.internal:1234/v1
+
+    volumes:
+      - ./data:/data
+
+    # Linux hosts: uncomment if host.docker.internal doesn't resolve.
+    # (Required on some Docker/Linux setups to reach the host from the container.)
+    # extra_hosts:
+    #   - "host.docker.internal:host-gateway"
+
+    healthcheck:
+      test:
+        - CMD
+        - wget
+        - -qO-
+        - http://127.0.0.1:3000/api/health
+      interval: 30s
+      timeout: 5s
+      start_period: 20s
+      retries: 3
+
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"

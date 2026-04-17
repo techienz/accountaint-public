@@ -1,7 +1,15 @@
 import { getLmStudioClient, checkLmStudioHealth } from "./client";
 import { LmStudioUnavailableError } from "./embeddings";
+import { getIntegrationConfig } from "@/lib/integrations/config";
 
-const LOCAL_MODEL = (process.env.LMSTUDIO_CHAT_MODEL || "").trim() || "qwen3.5-9b";
+function getChatModel(): string {
+  try {
+    const dbModel = getIntegrationConfig("local_llm", "chat_model");
+    if (dbModel && dbModel.trim()) return dbModel.trim();
+  } catch {}
+  const env = (process.env.LMSTUDIO_CHAT_MODEL || "").trim();
+  return env || "qwen3.5-9b";
+}
 
 export type LocalCompleteOptions = {
   system: string;
@@ -15,7 +23,7 @@ export async function localComplete(opts: LocalCompleteOptions): Promise<string>
 
   const client = getLmStudioClient();
   const response = await client.chat.completions.create({
-    model: LOCAL_MODEL,
+    model: getChatModel(),
     messages: [
       { role: "system", content: opts.system },
       { role: "user", content: opts.prompt },
