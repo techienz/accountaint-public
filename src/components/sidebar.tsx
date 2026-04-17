@@ -183,6 +183,7 @@ function buildNavItems(hasEmployees: boolean, xeroConnected: boolean): NavItem[]
         { href: "/settings/opening-balances", label: "Opening Balances", icon: Scale },
         { href: "/settings/migration", label: "Migration", icon: ArrowLeftRight },
         { href: "/settings/regulatory-updates", label: "Regulatory Updates", icon: ShieldCheck },
+        { href: "/settings/local-llm", label: "Local LLM", icon: Link2 },
         { href: "/settings/notifications", label: "Notifications", icon: Bell },
         { href: "/settings", label: "General", icon: Settings },
       ],

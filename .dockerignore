@@ -1,0 +1,49 @@
+# ─── Keep build context small ──────────────────────────────────────────
+.git
+.github
+.gitignore
+.gitattributes
+
+# Node
+node_modules
+npm-debug.log*
+
+# Next.js build output
+.next
+out
+
+# Runtime data (mounted as volume, never baked into image)
+data
+
+# Env files (values come via docker-compose env_file or env)
+.env
+.env.*
+!.env.example
+!.env.docker.example
+
+# Editor / OS
+.vscode
+.idea
+.DS_Store
+*.swp
+
+# Logs
+*.log
+logs
+
+# Tests + coverage
+coverage
+
+# Claude Code artefacts (private workspace)
+.claude
+docs/superpowers
+.playwright-mcp
+
+# Docker artefacts
+Dockerfile
+docker-compose.yml
+docker-compose.*.yml
+
+# Documentation that doesn't need to ship
+*.md
+!README.md
