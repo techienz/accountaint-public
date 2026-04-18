@@ -46,6 +46,73 @@ To rebuild from source instead of pulling, clone the repo and in `docker-compose
 
 **Local LLM note:** if LM Studio or Ollama is running on the host, use `host.docker.internal:PORT` as the URL (either in `.env` or via Settings → Local LLM in-app). If LM Studio isn't running at all, the app falls back to Claude Haiku with PII sanitisation — functional but less private.
 
+#### Drop-in compose example (Portainer-friendly)
+
+Self-contained stack — paste into a Portainer stack editor or a standalone `docker-compose.yml` and fill in the placeholder values. No separate `.env` file needed.
+
+```yaml
+services:
+  accountaint:
+    image: ghcr.io/techienz/accountaint:latest
+    container_name: accountaint
+    restart: unless-stopped
+    init: true                    # reaps Chromium zombie processes
+    shm_size: "1gb"               # Chromium needs more than the default 64MB
+    ports:
+      - "3000:3000"
+    environment:
+      # ─── Required secrets ─────────────────────────────────────────────────
+      # Generate each 32-byte key with:
+      #   node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+      APP_ENCRYPTION_KEY: "REPLACE_WITH_32_BYTE_HEX"
+      JWT_SECRET: "REPLACE_WITH_32_BYTE_HEX"
+      ANTHROPIC_API_KEY: "sk-ant-…"
+
+      # Web-push VAPID keys (for desktop notifications)
+      # Generate with: npx web-push generate-vapid-keys
+      VAPID_PUBLIC_KEY: "REPLACE_ME"
+      VAPID_PRIVATE_KEY: "REPLACE_ME"
+      VAPID_EMAIL: "mailto:you@example.com"
+
+      # ─── Local LLM (optional) ─────────────────────────────────────────────
+      # Uncomment and point at your local LLM. Values set in-app via
+      # Settings → Local LLM override these.
+      # LMSTUDIO_URL: "http://host.docker.internal:1234/v1"
+      # LMSTUDIO_CHAT_MODEL: "qwen3.5-9b"
+      # LMSTUDIO_EMBEDDING_MODEL: "nomic-ai/nomic-embed-text-v2-moe"
+
+      # ─── Xero (optional, only for parallel running) ───────────────────────
+      # XERO_CLIENT_ID: ""
+      # XERO_CLIENT_SECRET: ""
+      # XERO_GRANT_TYPE: "client_credentials"
+    volumes:
+      - accountaint-data:/data
+    # Uncomment on Linux if the Local LLM on the host is unreachable via
+    # host.docker.internal — this maps it to the host gateway explicitly.
+    # extra_hosts:
+    #   - "host.docker.internal:host-gateway"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/api/health"]
+      interval: 30s
+      timeout: 5s
+      start_period: 20s
+      retries: 3
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  accountaint-data:
+```
+
+**Notes:**
+- Named volume (`accountaint-data`) — Portainer manages it, no host-path UID issues. For bind-mount instead (so you can back up the files directly), replace with `./data:/data` and make sure the host directory is owned by UID 1000.
+- Port mapping — change the left side of `3000:3000` to expose on a different host port (e.g. `3020:3000` to match an existing reverse-proxy config).
+- HTTPS — put a reverse proxy (Nginx, Caddy, Traefik, Nginx Proxy Manager) in front. The app itself serves plain HTTP on port 3000.
+- Updating — in Portainer: Stack → Editor → Update → tick "Re-pull image". On CLI: `docker compose pull && docker compose up -d`.
+
 ### Option B: Systemd user service (direct on host)
 
 For long-running installs where you already manage the Node process directly.
