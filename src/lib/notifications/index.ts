@@ -2,10 +2,10 @@ import { getDb, schema } from "@/lib/db";
 import { eq } from "drizzle-orm";
 import { createNotification } from "./in-app";
 import { sendPushToUser } from "./desktop";
-import { sendEmail, type SmtpConfig } from "./email";
+import { sendEmail } from "./email";
+import { buildEmailConfig } from "./email-config";
 import { sendSlack } from "./slack";
 import { generateIcs } from "./ics";
-import { decrypt } from "@/lib/crypto";
 
 type NotifyInput = {
   businessId: string;
@@ -49,17 +49,9 @@ export async function notify(input: NotifyInput) {
 
       case "email": {
         try {
-          const config = pref.config ? JSON.parse(pref.config) : null;
-          if (!config?.smtp_host || !config?.to_address) break;
-
-          const smtpConfig: SmtpConfig = {
-            smtp_host: config.smtp_host,
-            smtp_port: config.smtp_port || 587,
-            smtp_user: config.smtp_user || "",
-            smtp_pass: config.smtp_pass ? decrypt(config.smtp_pass) : "",
-            from_address: config.from_address || config.smtp_user || "",
-            to_address: config.to_address,
-          };
+          const rawConfig = pref.config ? JSON.parse(pref.config) : null;
+          const emailConfig = buildEmailConfig(rawConfig);
+          if (!emailConfig) break;
 
           // Email subjects are always vague for security
           const emailSubject = `Accountaint: ${input.vagueTitle}`;
@@ -80,7 +72,7 @@ export async function notify(input: NotifyInput) {
             });
           }
 
-          await sendEmail(smtpConfig, emailSubject, emailBody, attachments.length > 0 ? attachments : undefined);
+          await sendEmail(emailConfig, emailSubject, emailBody, attachments.length > 0 ? attachments : undefined);
         } catch (err) {
           console.error("Email notification failed:", err instanceof Error ? err.message : err);
         }

@@ -1,10 +1,24 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { getDb, schema } from "@/lib/db";
-import { eq, and } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { v4 as uuid } from "uuid";
 import { encrypt } from "@/lib/crypto";
 import { getBusiness } from "@/lib/business";
+
+const SECRET_FIELDS = ["smtp_pass", "client_secret"] as const;
+
+function redactSecrets(configRaw: string | null): Record<string, unknown> {
+  if (!configRaw) return {};
+  const obj = JSON.parse(configRaw) as Record<string, unknown>;
+  for (const field of SECRET_FIELDS) {
+    if (obj[field]) {
+      obj[`${field}_set`] = true;
+      delete obj[field];
+    }
+  }
+  return obj;
+}
 
 export async function GET(request: NextRequest) {
   const session = await getSession();
@@ -29,7 +43,12 @@ export async function GET(request: NextRequest) {
     .where(eq(schema.notificationPreferences.business_id, businessId))
     .all();
 
-  return NextResponse.json({ preferences: prefs });
+  const sanitised = prefs.map((p) => ({
+    ...p,
+    config: redactSecrets(p.config),
+  }));
+
+  return NextResponse.json({ preferences: sanitised });
 }
 
 export async function PUT(request: NextRequest) {
@@ -52,21 +71,43 @@ export async function PUT(request: NextRequest) {
 
   const db = getDb();
 
-  // Delete existing prefs for this business
+  // Read existing prefs first so we can preserve secrets the user didn't re-enter
+  const existing = db
+    .select()
+    .from(schema.notificationPreferences)
+    .where(eq(schema.notificationPreferences.business_id, businessId))
+    .all();
+  const existingByChannel = new Map(existing.map((p) => [p.channel, p]));
+
+  // Delete existing prefs for this business (we'll re-insert)
   db.delete(schema.notificationPreferences)
     .where(eq(schema.notificationPreferences.business_id, businessId))
     .run();
 
-  // Insert new prefs
   for (const [channel, pref] of Object.entries(preferences)) {
     const p = pref as { enabled: boolean; detail_level: string; config: Record<string, string> };
 
-    // Encrypt smtp_pass if present
-    const config = { ...p.config };
-    if (config.smtp_pass && config.smtp_pass !== "") {
-      config.smtp_pass = encrypt(config.smtp_pass);
-    } else {
-      delete config.smtp_pass;
+    const config: Record<string, string> = { ...p.config };
+
+    // For each secret-bearing field:
+    //   - If user provided a non-empty new value → encrypt and use it
+    //   - If empty/missing but a previous secret existed → preserve the previous (still-encrypted) value
+    //   - Otherwise → drop the field
+    const previousConfig = existingByChannel.get(channel as "email" | "desktop" | "slack" | "in_app")?.config
+      ? (JSON.parse(existingByChannel.get(channel as "email" | "desktop" | "slack" | "in_app")!.config!) as Record<string, string>)
+      : {};
+
+    for (const field of SECRET_FIELDS) {
+      const incoming = config[field];
+      if (incoming && incoming.trim() !== "") {
+        config[field] = encrypt(incoming);
+      } else if (previousConfig[field]) {
+        config[field] = previousConfig[field];
+      } else {
+        delete config[field];
+      }
+      // Strip any incoming `*_set` flag — server-side concept only
+      delete config[`${field}_set`];
     }
 
     db.insert(schema.notificationPreferences)

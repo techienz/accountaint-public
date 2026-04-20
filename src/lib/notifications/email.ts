@@ -1,4 +1,15 @@
 import nodemailer from "nodemailer";
+import {
+  sendEmailViaGraph,
+  type GraphConfig,
+  type GraphEmailAttachment,
+} from "./graph-email";
+
+export type EmailAttachment = {
+  filename: string;
+  content: Buffer;
+  contentType: string;
+};
 
 export type SmtpConfig = {
   smtp_host: string;
@@ -9,35 +20,54 @@ export type SmtpConfig = {
   to_address: string;
 };
 
-export type EmailAttachment = {
-  filename: string;
-  content: Buffer;
-  contentType: string;
-};
+/**
+ * Unified email config. Selects the transport via `provider`.
+ *  - "smtp"  → nodemailer over SMTP (any provider that allows SMTP AUTH)
+ *  - "graph" → Microsoft Graph API (Office 365, no SMTP AUTH needed)
+ */
+export type EmailConfig =
+  | ({ provider?: "smtp" } & SmtpConfig)
+  | ({ provider: "graph" } & GraphConfig);
 
 export async function sendEmail(
-  config: SmtpConfig,
+  config: EmailConfig,
   subject: string,
   html: string,
   attachments?: EmailAttachment[],
   cc?: string[]
 ): Promise<void> {
+  const wrapped = wrapHtml(html);
+
+  if (config.provider === "graph") {
+    const graphAttachments: GraphEmailAttachment[] | undefined = attachments?.map(
+      (a) => ({
+        filename: a.filename,
+        content: a.content,
+        contentType: a.contentType,
+      })
+    );
+    await sendEmailViaGraph(config, subject, wrapped, graphAttachments, cc);
+    return;
+  }
+
+  // Default: SMTP
+  const smtp = config as SmtpConfig & { provider?: "smtp" };
   const transporter = nodemailer.createTransport({
-    host: config.smtp_host,
-    port: config.smtp_port,
-    secure: config.smtp_port === 465,
+    host: smtp.smtp_host,
+    port: smtp.smtp_port,
+    secure: smtp.smtp_port === 465,
     auth: {
-      user: config.smtp_user,
-      pass: config.smtp_pass,
+      user: smtp.smtp_user,
+      pass: smtp.smtp_pass,
     },
   });
 
   await transporter.sendMail({
-    from: config.from_address,
-    to: config.to_address,
+    from: smtp.from_address,
+    to: smtp.to_address,
     cc: cc && cc.length > 0 ? cc.join(", ") : undefined,
     subject,
-    html: wrapHtml(html),
+    html: wrapped,
     attachments: attachments?.map((a) => ({
       filename: a.filename,
       content: a.content,
