@@ -1,0 +1,167 @@
+export type TimesheetPdfEntry = {
+  date: string;
+  description: string | null;
+  start_time: string | null;
+  end_time: string | null;
+  duration_minutes: number;
+  billable: boolean;
+  hourly_rate: number | null;
+  amount: number;
+  status: string;
+};
+
+export type TimesheetPdfData = {
+  businessName: string;
+  contactName: string | null;
+  project: string;
+  projectCode: string | null;
+  periodStart: string; // YYYY-MM-DD
+  periodEnd: string; // YYYY-MM-DD
+  totalHours: number;
+  billableHours: number;
+  totalAmount: number;
+  entries: TimesheetPdfEntry[];
+};
+
+const fmt = (n: number) =>
+  "$" +
+  n.toLocaleString("en-NZ", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+
+const fmtHours = (minutes: number) => (minutes / 60).toFixed(2);
+
+function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function renderHtml(data: TimesheetPdfData): string {
+  const rows = data.entries
+    .map(
+      (e) => `
+    <tr>
+      <td>${escapeHtml(e.date)}</td>
+      <td>${e.start_time ? escapeHtml(e.start_time) : ""}${e.end_time ? `&mdash;${escapeHtml(e.end_time)}` : ""}</td>
+      <td class="desc">${e.description ? escapeHtml(e.description) : "<span class='muted'>—</span>"}</td>
+      <td class="right">${fmtHours(e.duration_minutes)}</td>
+      <td class="right">${e.hourly_rate != null ? fmt(e.hourly_rate) : ""}</td>
+      <td class="right">${fmt(e.amount)}</td>
+    </tr>`
+    )
+    .join("");
+
+  return `<!DOCTYPE html>
+<html><head><meta charset="utf-8">
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 12px; color: #1a1a1a; margin: 0; padding: 0; }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  h2 { font-size: 14px; margin: 16px 0 8px; border-bottom: 1px solid #ddd; padding-bottom: 4px; font-weight: 600; color: #333; }
+  .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 24px; }
+  .meta { color: #666; font-size: 11px; line-height: 1.5; }
+  .meta strong { color: #333; font-weight: 500; }
+  .summary { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; background: #f8f8f8; padding: 12px; border-radius: 6px; margin-bottom: 16px; }
+  .summary-item .label { font-size: 10px; color: #666; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 2px; }
+  .summary-item .value { font-size: 18px; font-weight: 600; }
+  table { width: 100%; border-collapse: collapse; margin: 8px 0; font-size: 11px; }
+  th { font-size: 10px; color: #666; text-transform: uppercase; letter-spacing: 0.3px; text-align: left; padding: 6px 8px; border-bottom: 2px solid #ccc; }
+  td { padding: 6px 8px; border-bottom: 1px solid #eee; vertical-align: top; }
+  td.right { text-align: right; white-space: nowrap; }
+  td.desc { max-width: 280px; }
+  .muted { color: #999; }
+  .totals td { border-top: 2px solid #333; border-bottom: none; font-weight: 600; font-size: 12px; padding-top: 10px; }
+  .footer { margin-top: 32px; font-size: 10px; color: #999; text-align: center; }
+</style></head><body>
+  <div style="padding: 24px 28px;">
+    <div class="header">
+      <div>
+        <h1>Timesheet</h1>
+        <p class="meta">
+          <strong>${escapeHtml(data.businessName)}</strong><br>
+          ${data.contactName ? `Billed to: ${escapeHtml(data.contactName)}<br>` : ""}
+          <strong>Project:</strong> ${escapeHtml(data.project)}${data.projectCode ? ` (${escapeHtml(data.projectCode)})` : ""}
+        </p>
+      </div>
+      <div class="meta" style="text-align: right;">
+        <strong>Period</strong><br>
+        ${escapeHtml(data.periodStart)} to<br>
+        ${escapeHtml(data.periodEnd)}
+      </div>
+    </div>
+
+    <div class="summary">
+      <div class="summary-item">
+        <div class="label">Total hours</div>
+        <div class="value">${data.totalHours.toFixed(2)}</div>
+      </div>
+      <div class="summary-item">
+        <div class="label">Billable hours</div>
+        <div class="value">${data.billableHours.toFixed(2)}</div>
+      </div>
+      <div class="summary-item">
+        <div class="label">Total amount</div>
+        <div class="value">${fmt(data.totalAmount)}</div>
+      </div>
+    </div>
+
+    <h2>Entries</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Date</th>
+          <th>Time</th>
+          <th>Description</th>
+          <th class="right">Hours</th>
+          <th class="right">Rate</th>
+          <th class="right">Amount</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${rows}
+        <tr class="totals">
+          <td colspan="3"><strong>${data.entries.length} entr${data.entries.length === 1 ? "y" : "ies"}</strong></td>
+          <td class="right">${data.totalHours.toFixed(2)}</td>
+          <td></td>
+          <td class="right">${fmt(data.totalAmount)}</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="footer">
+      Generated by Accountaint &middot; ${new Date().toISOString().slice(0, 10)}
+    </div>
+  </div>
+</body></html>`;
+}
+
+export async function generateTimesheetPdf(
+  data: TimesheetPdfData
+): Promise<Buffer> {
+  const html = renderHtml(data);
+  const puppeteer = await import("puppeteer");
+  const browser = await puppeteer.default.launch({
+    headless: true,
+    args: [
+      "--no-sandbox",
+      "--disable-setuid-sandbox",
+      "--disable-dev-shm-usage",
+    ],
+  });
+  try {
+    const page = await browser.newPage();
+    await page.setContent(html, { waitUntil: "networkidle0" });
+    const pdfBuffer = await page.pdf({
+      format: "A4",
+      printBackground: true,
+      margin: { top: "12mm", bottom: "12mm", left: "12mm", right: "12mm" },
+    });
+    return Buffer.from(pdfBuffer);
+  } finally {
+    await browser.close();
+  }
+}

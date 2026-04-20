@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { WeekView } from "@/components/timesheets/week-view";
 import { QuickAddForm } from "@/components/timesheets/quick-add-form";
 import { EditEntryForm } from "@/components/timesheets/edit-entry-form";
+import { EmailTimesheetDialog } from "@/components/timesheets/email-timesheet-dialog";
 import { ChevronLeft, ChevronRight, Plus, Calendar, Download } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { formatDateDisplay } from "@/lib/utils/dates";
@@ -29,6 +30,7 @@ type ActiveContract = {
   id: string;
   client_name: string;
   status: string;
+  contact_id?: string | null;
 };
 
 function getMonday(d: Date): Date {
@@ -243,6 +245,15 @@ export default function TimesheetsPage() {
               >
                 <Download className="mr-1 h-3.5 w-3.5" />Excel
               </Button>
+              <EmailTimesheetDialog
+                contracts={contracts.map((c) => ({
+                  id: c.id,
+                  client_name: c.client_name,
+                  contact_id: c.contact_id ?? null,
+                }))}
+                defaultDateFrom={formatDate(weekStart)}
+                defaultDateTo={formatDate(new Date(weekStart.getTime() + 6 * 86400000))}
+              />
             </>
           )}
           {draftIds.length > 0 && (

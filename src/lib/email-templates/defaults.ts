@@ -1,0 +1,114 @@
+// Default email templates + placeholder metadata per kind.
+//
+// Placeholders use {{variable}} syntax. Available variables are documented
+// per kind and shown to the user in the Settings → Email Templates UI.
+
+export type TemplateKind = "invoice" | "timesheet" | "payslip";
+
+export type TemplateDefault = {
+  label: string;
+  description: string;
+  subject: string;
+  body: string; // HTML
+  placeholders: Array<{ key: string; description: string }>;
+  sampleData: Record<string, string>;
+};
+
+export const TEMPLATE_DEFAULTS: Record<TemplateKind, TemplateDefault> = {
+  invoice: {
+    label: "Invoice",
+    description:
+      "Sent when emailing a sales invoice or a bill from the invoice detail page.",
+    subject: "{{document_kind}} {{invoice_number}} from {{business_name}}",
+    body: `<p>Hi {{contact_name}},</p>
+<p>Please find attached {{document_kind_lower}} {{invoice_number}}.</p>
+<p><strong>Amount due:</strong> {{amount_due}}<br>
+<strong>Due date:</strong> {{due_date}}</p>
+<p>Thanks,<br>
+{{business_name}}</p>`,
+    placeholders: [
+      { key: "business_name", description: "Your business name" },
+      { key: "contact_name", description: "Recipient's name" },
+      { key: "invoice_number", description: "e.g. INV-0042 or BILL-0013" },
+      { key: "document_kind", description: "'Invoice' or 'Bill' — capitalised" },
+      { key: "document_kind_lower", description: "'invoice' or 'bill'" },
+      { key: "amount_due", description: "Formatted $ amount" },
+      { key: "due_date", description: "Due date, YYYY-MM-DD" },
+      { key: "total_amount", description: "Invoice total (incl. GST)" },
+    ],
+    sampleData: {
+      business_name: "Acme Contracting Ltd",
+      contact_name: "Jane Smith",
+      invoice_number: "INV-0042",
+      document_kind: "Invoice",
+      document_kind_lower: "invoice",
+      amount_due: "$2,415.00",
+      due_date: "2026-05-20",
+      total_amount: "$2,415.00",
+    },
+  },
+  timesheet: {
+    label: "Timesheet",
+    description:
+      "Sent when emailing a timesheet to a client or project contact.",
+    subject: "Timesheet — {{project}} — {{period_start}} to {{period_end}}",
+    body: `<p>Hi {{contact_name}},</p>
+<p>Please find attached the timesheet for <strong>{{project}}</strong> covering {{period_start}} to {{period_end}}.</p>
+<p><strong>Total hours:</strong> {{total_hours}}<br>
+<strong>Total amount:</strong> {{total_amount}}<br>
+<strong>Entries:</strong> {{entry_count}}</p>
+<p>Thanks,<br>
+{{business_name}}</p>`,
+    placeholders: [
+      { key: "business_name", description: "Your business name" },
+      { key: "contact_name", description: "Recipient's name (may be blank)" },
+      { key: "project", description: "Project / work contract name" },
+      { key: "period_start", description: "Period start date, YYYY-MM-DD" },
+      { key: "period_end", description: "Period end date, YYYY-MM-DD" },
+      { key: "total_hours", description: "Total hours in period, e.g. 38.5" },
+      { key: "total_amount", description: "Billable total, e.g. $3,850.00" },
+      { key: "entry_count", description: "Number of timesheet entries" },
+    ],
+    sampleData: {
+      business_name: "Acme Contracting Ltd",
+      contact_name: "Sam Patel",
+      project: "Project Phoenix",
+      period_start: "2026-04-13",
+      period_end: "2026-04-19",
+      total_hours: "38.5",
+      total_amount: "$3,850.00",
+      entry_count: "5",
+    },
+  },
+  payslip: {
+    label: "Payslip",
+    description:
+      "Sent to each employee when distributing their payslip from a finalised pay run.",
+    subject: "Payslip — {{period_start}} to {{period_end}}",
+    body: `<p>Hi {{employee_name}},</p>
+<p>Please find attached your payslip for the pay period {{period_start}} to {{period_end}}, paid on {{pay_date}}.</p>
+<p><strong>Gross pay:</strong> {{gross_pay}}<br>
+<strong>Net pay:</strong> {{net_pay}}</p>
+<p>If anything looks wrong, let me know.</p>
+<p>Thanks,<br>
+{{business_name}}</p>`,
+    placeholders: [
+      { key: "business_name", description: "Your business name" },
+      { key: "employee_name", description: "Employee's name" },
+      { key: "period_start", description: "Pay period start YYYY-MM-DD" },
+      { key: "period_end", description: "Pay period end YYYY-MM-DD" },
+      { key: "pay_date", description: "Pay date YYYY-MM-DD" },
+      { key: "gross_pay", description: "Gross pay amount" },
+      { key: "net_pay", description: "Net pay amount" },
+    ],
+    sampleData: {
+      business_name: "Acme Contracting Ltd",
+      employee_name: "Alex Chen",
+      period_start: "2026-04-06",
+      period_end: "2026-04-19",
+      pay_date: "2026-04-22",
+      gross_pay: "$1,923.08",
+      net_pay: "$1,447.56",
+    },
+  },
+};

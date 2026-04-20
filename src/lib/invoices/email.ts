@@ -5,6 +5,7 @@ import { getContact } from "@/lib/contacts";
 import { generateInvoicePdf } from "./pdf";
 import { sendEmail } from "@/lib/notifications/email";
 import { buildEmailConfig } from "@/lib/notifications/email-config";
+import { getTemplate, renderTemplate } from "@/lib/email-templates";
 
 export async function sendInvoiceEmail(
   invoiceId: string,
@@ -53,14 +54,23 @@ export async function sendInvoiceEmail(
   const pdfBuffer = await generateInvoicePdf(invoice, business, contact);
 
   const isInvoice = invoice.type === "ACCREC";
-  const emailSubject =
-    subject ||
-    `${isInvoice ? "Invoice" : "Bill"} ${invoice.invoice_number} from ${business.name}`;
-  const emailBody =
-    body ||
-    `<p>Please find attached ${isInvoice ? "invoice" : "bill"} ${invoice.invoice_number}.</p>
-     <p>Amount due: $${invoice.amount_due.toLocaleString("en-NZ", { minimumFractionDigits: 2 })}</p>
-     <p>Due date: ${invoice.due_date}</p>`;
+  const template = getTemplate(businessId, "invoice");
+  const fmt = (n: number) =>
+    "$" + n.toLocaleString("en-NZ", { minimumFractionDigits: 2 });
+
+  const variables = {
+    business_name: business.name,
+    contact_name: contact.name,
+    invoice_number: invoice.invoice_number,
+    document_kind: isInvoice ? "Invoice" : "Bill",
+    document_kind_lower: isInvoice ? "invoice" : "bill",
+    amount_due: fmt(invoice.amount_due),
+    due_date: invoice.due_date,
+    total_amount: fmt(invoice.total),
+  };
+
+  const emailSubject = subject?.trim() || renderTemplate(template.subject, variables);
+  const emailBody = body?.trim() || renderTemplate(template.body, variables);
 
   // Get CC emails from contact or explicit parameter
   const cc = ccEmails && ccEmails.length > 0

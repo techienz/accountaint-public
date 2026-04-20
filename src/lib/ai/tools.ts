@@ -24,7 +24,7 @@ import { listContracts, getContractSummary } from "@/lib/contracts";
 import { calculateSnapshotMetrics } from "@/lib/reports/snapshot";
 import { listExpenses, getExpenseSummary } from "@/lib/expenses";
 import { listWorkContracts, getWorkContractSummary, calculateEarningsProjection } from "@/lib/work-contracts";
-import { listTimesheetEntries, getTimesheetSummary, createTimesheetEntry, approveTimesheetEntries } from "@/lib/timesheets";
+import { listTimesheetEntries, getTimesheetSummary, createTimesheetEntry, approveTimesheetEntries, deleteTimesheetEntry } from "@/lib/timesheets";
 import { listInvoices, getInvoiceSummary, toXeroInvoiceFormat } from "@/lib/invoices";
 import { createInvoiceFromTimesheets } from "@/lib/invoices/from-timesheets";
 import { sendInvoiceEmail } from "@/lib/invoices/email";
@@ -757,6 +757,86 @@ export const chatTools: Tool[] = [
         },
       },
       required: [],
+    },
+  },
+  {
+    name: "email_payslips",
+    description:
+      "Email payslips to employees from a finalised pay run. One email per employee with their own payslip PDF attached. Uses the Payslip email template by default. Pay run must be finalised first; employees must have an email address on their record.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        pay_run_id: { type: "string", description: "Pay run ID" },
+        employee_ids: {
+          type: "array",
+          items: { type: "string" },
+          description: "Employee IDs to send to. If omitted, sends to all employees in the pay run.",
+        },
+        subject: {
+          type: "string",
+          description: "Per-send subject override. Applied to all emails in this batch.",
+        },
+        body: {
+          type: "string",
+          description: "Per-send body (HTML) override. Applied to all emails in this batch.",
+        },
+      },
+      required: ["pay_run_id"],
+    },
+  },
+  {
+    name: "email_timesheet",
+    description:
+      "Email a timesheet to a recipient. Attaches the timesheet as PDF, Excel, and/or CSV. Uses the Timesheet email template by default but the subject/body can be overridden per send. Defaults to approved + invoiced entries only — set include_drafts=true to include draft entries.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        contract_id: {
+          type: "string",
+          description: "Work contract ID — use get_work_contracts to find it.",
+        },
+        date_from: { type: "string", description: "YYYY-MM-DD start of range" },
+        date_to: { type: "string", description: "YYYY-MM-DD end of range (inclusive)" },
+        recipient: { type: "string", description: "Recipient email address" },
+        cc_emails: {
+          type: "array",
+          items: { type: "string" },
+          description: "Optional CC recipients",
+        },
+        formats: {
+          type: "array",
+          items: { type: "string", enum: ["pdf", "xlsx", "csv"] },
+          description: "Attachment formats — one or more of pdf, xlsx, csv. Defaults to ['pdf'] if not set.",
+        },
+        include_drafts: {
+          type: "boolean",
+          description: "Include draft entries (not just approved/invoiced). Default false.",
+        },
+        subject: {
+          type: "string",
+          description: "Per-send subject override. Leave empty to use the Timesheet template.",
+        },
+        body: {
+          type: "string",
+          description: "Per-send body (HTML) override. Leave empty to use the Timesheet template.",
+        },
+      },
+      required: ["contract_id", "date_from", "date_to", "recipient"],
+    },
+  },
+  {
+    name: "delete_timesheet_entries",
+    description: "Delete one or more timesheet entries. Works on any status — if an entry is already invoiced, it will be unlinked from the invoice first. Use get_recent_time_entries or get_timesheet_summary to find entry IDs first. Always confirm the user's intent before deleting more than one entry.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        entry_ids: {
+          type: "array",
+          items: { type: "string" },
+          description: "Array of timesheet entry IDs to delete. Required — never defaults to 'all'.",
+        },
+      },
+      required: ["entry_ids"],
     },
   },
   {
@@ -1790,6 +1870,80 @@ export async function executeTool(
       if (allDraft.length === 0) return { message: "No draft entries to approve" };
       const count = approveTimesheetEntries(businessId, allDraft.map((e) => e.id));
       return { success: true, approved: count };
+    }
+
+    case "email_payslips": {
+      const { sendPayslipEmails } = await import("@/lib/payroll/email");
+      const payRunId = toolInput.pay_run_id as string;
+      if (!payRunId) return { error: "pay_run_id is required" };
+      try {
+        const result = await sendPayslipEmails({
+          businessId,
+          payRunId,
+          employeeIds: toolInput.employee_ids as string[] | undefined,
+          subject: toolInput.subject as string | undefined,
+          body: toolInput.body as string | undefined,
+        });
+        return {
+          success: result.failedCount === 0,
+          sent: result.sentCount,
+          failed: result.failedCount,
+          results: result.results,
+        };
+      } catch (err) {
+        return { error: err instanceof Error ? err.message : "Failed to email payslips" };
+      }
+    }
+
+    case "email_timesheet": {
+      const { sendTimesheetEmail } = await import("@/lib/timesheets/email");
+      const contractId = toolInput.contract_id as string;
+      const dateFrom = toolInput.date_from as string;
+      const dateTo = toolInput.date_to as string;
+      const recipient = toolInput.recipient as string;
+      if (!contractId || !dateFrom || !dateTo || !recipient) {
+        return { error: "contract_id, date_from, date_to, recipient are required" };
+      }
+      const formats = (toolInput.formats as Array<"pdf" | "xlsx" | "csv">) ?? ["pdf"];
+      try {
+        const result = await sendTimesheetEmail({
+          businessId,
+          contractId,
+          dateFrom,
+          dateTo,
+          recipient,
+          ccEmails: toolInput.cc_emails as string[] | undefined,
+          formats,
+          includeDrafts: toolInput.include_drafts as boolean | undefined,
+          subject: toolInput.subject as string | undefined,
+          body: toolInput.body as string | undefined,
+        });
+        return {
+          success: true,
+          message: `Sent ${result.entryCount} entr${result.entryCount === 1 ? "y" : "ies"} (${result.totalHours.toFixed(2)} hrs, $${result.totalAmount.toLocaleString("en-NZ", { minimumFractionDigits: 2 })}) to ${recipient}.`,
+        };
+      } catch (err) {
+        return { error: err instanceof Error ? err.message : "Failed to email timesheet" };
+      }
+    }
+
+    case "delete_timesheet_entries": {
+      const entryIds = toolInput.entry_ids as string[] | undefined;
+      if (!entryIds || entryIds.length === 0) {
+        return { error: "entry_ids is required — specify which entries to delete" };
+      }
+      let deleted = 0;
+      const notFound: string[] = [];
+      for (const id of entryIds) {
+        const ok = deleteTimesheetEntry(id, businessId);
+        if (ok) deleted++;
+        else notFound.push(id);
+      }
+      return {
+        success: true,
+        deleted,
+        not_found: notFound.length > 0 ? notFound : undefined,
+      };
     }
 
     case "create_expense": {

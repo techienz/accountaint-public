@@ -64,3 +64,4 @@ export { regulatoryCheckRuns, regulatoryChecks } from "./regulatory";
 export { taxOptimisationResults } from "./tax-optimisation";
 export { integrationConfig } from "./integration-config";
 export { dividendDeclarations } from "./dividends";
+export { emailTemplates } from "./email-templates";
