@@ -185,6 +185,7 @@ function buildNavItems(hasEmployees: boolean, xeroConnected: boolean): NavItem[]
         { href: "/settings/regulatory-updates", label: "Regulatory Updates", icon: ShieldCheck },
         { href: "/settings/local-llm", label: "Local LLM", icon: Link2 },
         { href: "/settings/notifications", label: "Notifications", icon: Bell },
+        { href: "/settings/email-templates", label: "Email Templates", icon: Receipt },
         { href: "/settings", label: "General", icon: Settings },
       ],
     },

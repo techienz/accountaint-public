@@ -10,6 +10,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import { ArrowLeft, Download, Trash2 } from "lucide-react";
+import { EmailPayslipsDialog } from "@/components/payroll/email-payslips-dialog";
 
 type PayRunLine = {
   id: string;
@@ -88,6 +89,13 @@ export default function PayRunDetailPage() {
             {payRun.period_start} to {payRun.period_end} ({payRun.frequency})
           </p>
         </div>
+        {payRun.status === "finalised" && (
+          <EmailPayslipsDialog
+            payRunId={payRun.id}
+            lines={payRun.lines}
+            employeesByIdName={employees}
+          />
+        )}
         {payRun.status === "draft" && (
           <Button
             variant="destructive"
