@@ -3,7 +3,7 @@ import { getSession } from "@/lib/auth";
 import { getDb, schema } from "@/lib/db";
 import { eq } from "drizzle-orm";
 import { getBusiness } from "@/lib/business";
-import { sendEmail, type SmtpConfig } from "@/lib/notifications/email";
+import { sendEmail, type EmailConfig } from "@/lib/notifications/email";
 import { sendSlack } from "@/lib/notifications/slack";
 import { decrypt } from "@/lib/crypto";
 
@@ -41,21 +41,48 @@ export async function POST(request: NextRequest) {
 
   try {
     if (channel === "email") {
-      if (!config.smtp_host || !config.to_address) {
-        return NextResponse.json({ error: "SMTP not fully configured" }, { status: 400 });
+      const provider = config.provider === "graph" ? "graph" : "smtp";
+
+      if (!config.to_address) {
+        return NextResponse.json(
+          { error: "Recipient (to_address) not configured" },
+          { status: 400 }
+        );
       }
 
-      const smtpConfig: SmtpConfig = {
-        smtp_host: config.smtp_host,
-        smtp_port: parseInt(config.smtp_port) || 587,
-        smtp_user: config.smtp_user || "",
-        smtp_pass: config.smtp_pass ? decrypt(config.smtp_pass) : "",
-        from_address: config.from_address || config.smtp_user || "",
-        to_address: config.to_address,
-      };
+      let emailConfig: EmailConfig;
+      if (provider === "graph") {
+        if (!config.tenant_id || !config.client_id || !config.client_secret || !config.from_address) {
+          return NextResponse.json(
+            { error: "Graph provider needs tenant_id, client_id, client_secret, and from_address" },
+            { status: 400 }
+          );
+        }
+        emailConfig = {
+          provider: "graph",
+          tenant_id: config.tenant_id,
+          client_id: config.client_id,
+          client_secret: decrypt(config.client_secret),
+          from_address: config.from_address,
+          to_address: config.to_address,
+        };
+      } else {
+        if (!config.smtp_host) {
+          return NextResponse.json({ error: "SMTP host not configured" }, { status: 400 });
+        }
+        emailConfig = {
+          provider: "smtp",
+          smtp_host: config.smtp_host,
+          smtp_port: parseInt(config.smtp_port) || 587,
+          smtp_user: config.smtp_user || "",
+          smtp_pass: config.smtp_pass ? decrypt(config.smtp_pass) : "",
+          from_address: config.from_address || config.smtp_user || "",
+          to_address: config.to_address,
+        };
+      }
 
       await sendEmail(
-        smtpConfig,
+        emailConfig,
         "Accountaint: Test notification",
         "<h2>Test notification</h2><p>This is a test email from Accountaint. If you received this, your email notifications are working correctly.</p>"
       );

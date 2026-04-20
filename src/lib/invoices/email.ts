@@ -3,8 +3,8 @@ import { eq } from "drizzle-orm";
 import { getInvoice } from "./index";
 import { getContact } from "@/lib/contacts";
 import { generateInvoicePdf } from "./pdf";
-import { sendEmail, type SmtpConfig } from "@/lib/notifications/email";
-import { decrypt } from "@/lib/crypto";
+import { sendEmail } from "@/lib/notifications/email";
+import { buildEmailConfig } from "@/lib/notifications/email-config";
 
 export async function sendInvoiceEmail(
   invoiceId: string,
@@ -40,19 +40,14 @@ export async function sendInvoiceEmail(
     throw new Error("Email not configured. Set up email in Notification Preferences.");
   }
 
-  const config = JSON.parse(prefs.config);
-  if (!config.smtp_host) {
-    throw new Error("SMTP not configured.");
+  const rawConfig = JSON.parse(prefs.config);
+  // Override the to_address with this invoice's recipient
+  const emailConfig = buildEmailConfig({ ...rawConfig, to_address: recipientEmail });
+  if (!emailConfig) {
+    throw new Error(
+      "Email not fully configured. Open Settings → Notifications → Email to fill in the missing fields."
+    );
   }
-
-  const smtpConfig: SmtpConfig = {
-    smtp_host: config.smtp_host,
-    smtp_port: config.smtp_port || 587,
-    smtp_user: config.smtp_user || "",
-    smtp_pass: config.smtp_pass ? decrypt(config.smtp_pass) : "",
-    from_address: config.from_address || config.smtp_user || "",
-    to_address: recipientEmail,
-  };
 
   // Generate PDF
   const pdfBuffer = await generateInvoicePdf(invoice, business, contact);
@@ -74,7 +69,7 @@ export async function sendInvoiceEmail(
       ? contact.cc_emails.split(",").map((e: string) => e.trim()).filter(Boolean)
       : undefined;
 
-  await sendEmail(smtpConfig, emailSubject, emailBody, [
+  await sendEmail(emailConfig, emailSubject, emailBody, [
     {
       filename: `${invoice.invoice_number}.pdf`,
       content: pdfBuffer,

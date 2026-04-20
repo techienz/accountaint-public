@@ -143,46 +143,106 @@ export function NotificationPrefsClient({ businessId, preferences }: Props) {
 
               {ch.key === "email" && (
                 <div className="space-y-3">
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="space-y-1">
-                      <Label>SMTP Host</Label>
-                      <Input
-                        value={prefs.email.config.smtp_host || ""}
-                        onChange={(e) => updateConfig("email", "smtp_host", e.target.value)}
-                        placeholder="smtp.office365.com"
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <Label>Port</Label>
-                      <Input
-                        value={prefs.email.config.smtp_port || "587"}
-                        onChange={(e) => updateConfig("email", "smtp_port", e.target.value)}
-                        placeholder="587"
-                      />
-                    </div>
-                  </div>
                   <div className="space-y-1">
-                    <Label>SMTP Username</Label>
-                    <Input
-                      value={prefs.email.config.smtp_user || ""}
-                      onChange={(e) => updateConfig("email", "smtp_user", e.target.value)}
-                    />
+                    <Label>Send via</Label>
+                    <Select
+                      value={prefs.email.config.provider || "smtp"}
+                      onValueChange={(v) => updateConfig("email", "provider", v ?? "smtp")}
+                    >
+                      <SelectTrigger className="w-[280px]">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="smtp">SMTP (any provider)</SelectItem>
+                        <SelectItem value="graph">Microsoft Graph (Office 365)</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
-                  <div className="space-y-1">
-                    <Label>SMTP Password</Label>
-                    <Input
-                      type="password"
-                      value={prefs.email.config.smtp_pass || ""}
-                      onChange={(e) => updateConfig("email", "smtp_pass", e.target.value)}
-                      placeholder={prefs.email.config.smtp_pass_set ? "••••••••" : ""}
-                    />
-                  </div>
+
+                  {(prefs.email.config.provider || "smtp") === "smtp" ? (
+                    <>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="space-y-1">
+                          <Label>SMTP Host</Label>
+                          <Input
+                            value={prefs.email.config.smtp_host || ""}
+                            onChange={(e) => updateConfig("email", "smtp_host", e.target.value)}
+                            placeholder="smtp.resend.com"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <Label>Port</Label>
+                          <Input
+                            value={prefs.email.config.smtp_port || "587"}
+                            onChange={(e) => updateConfig("email", "smtp_port", e.target.value)}
+                            placeholder="587"
+                          />
+                        </div>
+                      </div>
+                      <div className="space-y-1">
+                        <Label>SMTP Username</Label>
+                        <Input
+                          value={prefs.email.config.smtp_user || ""}
+                          onChange={(e) => updateConfig("email", "smtp_user", e.target.value)}
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label>SMTP Password</Label>
+                        <Input
+                          type="password"
+                          value={prefs.email.config.smtp_pass || ""}
+                          onChange={(e) => updateConfig("email", "smtp_pass", e.target.value)}
+                          placeholder={prefs.email.config.smtp_pass_set ? "•••••••• (saved — leave blank to keep)" : ""}
+                        />
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <p className="text-xs text-muted-foreground">
+                        Sends mail via Microsoft Graph using OAuth2 client
+                        credentials — works with Security Defaults enabled. Set
+                        up an Azure App registration with{" "}
+                        <code>Mail.Send</code> application permission (admin
+                        consent) and a client secret.
+                      </p>
+                      <div className="space-y-1">
+                        <Label>Tenant ID</Label>
+                        <Input
+                          value={prefs.email.config.tenant_id || ""}
+                          onChange={(e) => updateConfig("email", "tenant_id", e.target.value)}
+                          placeholder="00000000-0000-0000-0000-000000000000"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label>Application (client) ID</Label>
+                        <Input
+                          value={prefs.email.config.client_id || ""}
+                          onChange={(e) => updateConfig("email", "client_id", e.target.value)}
+                          placeholder="00000000-0000-0000-0000-000000000000"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label>Client secret value</Label>
+                        <Input
+                          type="password"
+                          value={prefs.email.config.client_secret || ""}
+                          onChange={(e) => updateConfig("email", "client_secret", e.target.value)}
+                          placeholder={prefs.email.config.client_secret_set ? "•••••••• (saved — leave blank to keep)" : ""}
+                        />
+                      </div>
+                    </>
+                  )}
+
                   <div className="space-y-1">
                     <Label>From address</Label>
                     <Input
                       value={prefs.email.config.from_address || ""}
                       onChange={(e) => updateConfig("email", "from_address", e.target.value)}
-                      placeholder="you@example.com"
+                      placeholder={
+                        prefs.email.config.provider === "graph"
+                          ? "you@yourdomain.com (mailbox UPN)"
+                          : "you@example.com"
+                      }
                     />
                   </div>
                   <div className="space-y-1">
