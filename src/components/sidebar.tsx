@@ -46,6 +46,7 @@ import {
   Sun,
   Moon,
   Banknote,
+  Activity,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { BusinessSwitcher } from "./business-switcher";
@@ -187,6 +188,7 @@ function buildNavItems(hasEmployees: boolean, xeroConnected: boolean): NavItem[]
         { href: "/settings/notifications", label: "Notifications", icon: Bell },
         { href: "/settings/email-templates", label: "Email Templates", icon: Receipt },
         { href: "/settings/email-log", label: "Email Log", icon: FileText },
+        { href: "/audit", label: "System Health", icon: Activity },
         { href: "/settings", label: "General", icon: Settings },
       ],
     },
