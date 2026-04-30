@@ -23,8 +23,8 @@ Two supported options. Pick one:
 
 ```bash
 # 1. Pull the compose file
-curl -O https://raw.githubusercontent.com/techienz/accountaint-public/main/docker-compose.yml
-curl -O https://raw.githubusercontent.com/techienz/accountaint-public/main/.env.docker.example
+curl -O https://raw.githubusercontent.com/techienz/accountaint/main/docker-compose.yml
+curl -O https://raw.githubusercontent.com/techienz/accountaint/main/.env.docker.example
 
 # 2. Copy the env template and fill in secrets
 cp .env.docker.example .env
@@ -118,8 +118,8 @@ volumes:
 For long-running installs where you already manage the Node process directly.
 
 ```bash
-git clone https://github.com/techienz/accountaint-public.git
-cd accountaint-public
+git clone https://github.com/techienz/accountaint.git
+cd accountaint
 npm ci
 cp .env.example .env        # fill in secrets
 npx drizzle-kit push        # create DB schema
@@ -149,13 +149,13 @@ You're ready to go. The AI chat (click the icon top-right) can walk you through 
 
 ## Documentation
 
-Full architecture, design decisions, and knowledge system docs live in the **[wiki](https://github.com/techienz/accountaint-public/wiki)**:
+Full architecture, design decisions, and knowledge system docs live in the **[wiki](https://github.com/techienz/accountaint/wiki)**:
 
-- [Architecture](https://github.com/techienz/accountaint-public/wiki/Architecture)
-- [Design Decisions](https://github.com/techienz/accountaint-public/wiki/Design-Decisions)
-- [Database Schema](https://github.com/techienz/accountaint-public/wiki/Database-Schema)
-- [NZ Tax Knowledge](https://github.com/techienz/accountaint-public/wiki/NZ-Tax-Knowledge)
-- [Xero Integration](https://github.com/techienz/accountaint-public/wiki/Xero-Integration)
+- [Architecture](https://github.com/techienz/accountaint/wiki/Architecture)
+- [Design Decisions](https://github.com/techienz/accountaint/wiki/Design-Decisions)
+- [Database Schema](https://github.com/techienz/accountaint/wiki/Database-Schema)
+- [NZ Tax Knowledge](https://github.com/techienz/accountaint/wiki/NZ-Tax-Knowledge)
+- [Xero Integration](https://github.com/techienz/accountaint/wiki/Xero-Integration)
 
 ## Tech Stack
 
