@@ -5,6 +5,26 @@ import { checkLmStudioHealth, getLmStudioClient } from "@/lib/lmstudio/client";
 import { sanitise } from "@/lib/ai/sanitise";
 import type { SanitisationMap } from "@/lib/ai/types";
 
+// Whitelisted root for attachment paths. Any resolved path that escapes this
+// directory is rejected — protects against path-traversal LFI where a client
+// (or AI prompt-injected via a chat tool) supplies "../.env" or similar.
+// Audit finding #63 (2026-05-01).
+const ATTACHMENT_ROOT = path.resolve(process.cwd(), "data/chat-attachments");
+
+function isPathSafe(suppliedPath: string): boolean {
+  // Reject empty/null inputs
+  if (!suppliedPath || typeof suppliedPath !== "string") return false;
+  // Reject absolute paths up front (shouldn't be possible from a client, defence-in-depth)
+  if (path.isAbsolute(suppliedPath)) return false;
+  // Resolve relative to cwd, then check the result lives under ATTACHMENT_ROOT.
+  // path.resolve normalises ../ traversal so the prefix check is sound.
+  const resolved = path.resolve(process.cwd(), suppliedPath);
+  // Use path.relative to guard against partial-prefix matches
+  // (e.g., "data/chat-attachments-other" should not pass).
+  const rel = path.relative(ATTACHMENT_ROOT, resolved);
+  return rel !== "" && !rel.startsWith("..") && !path.isAbsolute(rel);
+}
+
 type AttachmentInput = {
   filename: string;
   mimetype: string;
@@ -39,7 +59,14 @@ export async function processAttachments(
   const metadata: AttachmentMeta[] = [];
 
   for (const att of attachments) {
-    const fullPath = path.join(process.cwd(), att.path);
+    // Hard reject any path that resolves outside data/chat-attachments/.
+    // Logged at WARN so attempts are visible (and traceable to the user via
+    // the chat_actions audit log — same conversation_id).
+    if (!isPathSafe(att.path)) {
+      console.warn(`[attachments] Rejected unsafe attachment path: ${JSON.stringify(att.path)}`);
+      continue;
+    }
+    const fullPath = path.resolve(process.cwd(), att.path);
     if (!fs.existsSync(fullPath)) continue;
 
     if (IMAGE_TYPES.includes(att.mimetype)) {
